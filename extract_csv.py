@@ -23,31 +23,32 @@ def extract_data_from_file(file_path):
         with open(file_path, 'r') as file:
             data = json.load(file)
 
+            # DA CAMBIARE SE SI CAMBIA COME VENGONO SALVATI I RISULTATI
             if 'forecasting' in args.directory:
                 data = data['ours']
-                match = re.search(r'([^/]+)__forecast_multivar_', file_path).group(1)
-            elif 'classification' in args.directory:
-                match = re.search(r'([^/]+)__classification_', file_path).group(1)
-            elif 'anomaly_detection' in args.directory:
-                match = re.search(r'([^/]+)__anomaly_detection_', file_path).group(1)
+            #     # match = re.search(r'([^/]+)__forecast_multivar_', file_path).group(1)
+            # elif 'classification' in args.directory:
+            #     match = re.search(r'([^/]+)__classification_', file_path).group(1)
+            # elif 'anomaly_detection' in args.directory:
+            #     match = re.search(r'([^/]+)__anomaly_detection_', file_path).group(1)
             else:
                 raise ValueError(f"Unknown task type")
 
             splits = file_path.split('/')
             model_name = splits[4]
-            extract_data = {model_name:{match: {}}}
+            extract_data = {model_name:{splits[5]: {}}}
             if 'forecasting' in args.directory:
                 for key in data.keys():
-                    extract_data[model_name][match][key] ={
+                    extract_data[model_name][splits[5]][key] ={
                         'MAE': round(data[key]['norm']['MAE'], 4),
                         'MSE': round(data[key]['norm']['MSE'], 4)
                     }
             elif 'classification' in args.directory:
-                extract_data[model_name][match] ={
+                extract_data[model_name][splits[5]] ={
                     'acc': round(data['acc'], 4),
                 }
             elif 'anomaly_detection' in args.directory:
-                extract_data[model_name][match] ={
+                extract_data[model_name][splits[5]] ={
                     'f1': round(data['f1'], 4),
                     'precision': round(data['precision'], 4),
                     'recall': round(data['recall'], 4)
@@ -141,6 +142,6 @@ def main(directory, output_csv):
 if __name__ == "__main__":
     parser = ArgumentParser(description='Insertion of correct path to save the csv')
     parser.add_argument('--directory', type=str, help='Directory where the eval_res.json files are located')
-    args = parser.parse_args()
+    args = parser.parse_args(['--directory', 'forecasting/normal'])
     output_csv = "results.csv"  # Cambia il nome del file CSV se necessario
     main(f'./training/{args.directory}', output_csv)
