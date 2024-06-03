@@ -28,7 +28,7 @@ def save_checkpoint_callback(
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', default='ETTh1', help='The dataset name')
+    parser.add_argument('--dataset', default='ETTh2', help='The dataset name')
     parser.add_argument('--kernels', type=int, nargs='+',
                         default=[1, 2, 4, 8, 16, 32, 64, 128, 256, 1, 2, 4, 8, 16, 32, 64, 128, 256],
                         help='The kernel sizes used in the mixture of AR expert layers')
@@ -120,7 +120,7 @@ if __name__ == '__main__':
         **config
     )
 
-    loss_log, best_net = model.fit(
+    loss_log, best_net_avg, best_net_err = model.fit(
         train_data,
         # pert_data=None,
         n_epochs=args.epochs,
@@ -132,15 +132,10 @@ if __name__ == '__main__':
 
     t = time.time() - t
     print(f"\nTraining time: {datetime.timedelta(seconds=t)}\n")
-    # TODO change save classifier for all conditions
-    if args.eval:
-        if task_type == 'forecasting':
-            out, eval_res = tasks.eval_forecasting(model, data, train_slice, valid_slice, test_slice, scaler, pred_lens,
-                                                   n_time_cols)
-        else:
-            assert False
-        pkl_save(f'{run_dir}/out.pkl', out)
-        pkl_save(f'{run_dir}/eval_res.pkl', eval_res)
-        print('Evaluation result:', eval_res)
+
+    out, eval_res = tasks.eval_forecasting(model, data, train_slice, valid_slice, test_slice, scaler, pred_lens, n_time_cols)
+    pkl_save(f'{run_dir}/out.pkl', out)
+    pkl_save(f'{run_dir}/eval_res.pkl', eval_res)
+    print('Evaluation result:', eval_res)
 
     print("Finished.")
