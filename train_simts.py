@@ -117,7 +117,7 @@ if __name__ == '__main__':
         unit = 'epoch' if args.epochs is not None else 'iter'
         config[f'after_{unit}_callback'] = save_checkpoint_callback(args.save_every, unit)
 
-    run_dir = './' + args.dir + '/' + args.dataset
+    run_dir = './' + args.dir + '/normal/' + args.dataset
     os.makedirs(run_dir, exist_ok=True)
     
     t = time.time()

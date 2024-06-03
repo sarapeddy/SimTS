@@ -1,3 +1,5 @@
+import json
+
 import torch
 import random
 import numpy as np
@@ -109,7 +111,7 @@ if __name__ == '__main__':
         unit = 'epoch' if args.epochs is not None else 'iter'
         config[f'after_{unit}_callback'] = save_checkpoint_callback(args.save_every, unit)
 
-    run_dir = './' + args.dir + '/' + args.dataset
+    run_dir = './' + args.dir + '/dlinear/' + args.dataset
     os.makedirs(run_dir, exist_ok=True)
 
     t = time.time()
@@ -137,5 +139,8 @@ if __name__ == '__main__':
     pkl_save(f'{run_dir}/out.pkl', out)
     pkl_save(f'{run_dir}/eval_res.pkl', eval_res)
     print('Evaluation result:', eval_res)
+
+    with open(f'{run_dir}/eval_res.json', 'w') as json_file:
+        json.dump(eval_res, json_file, indent=4)
 
     print("Finished.")
