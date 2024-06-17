@@ -10,6 +10,7 @@ import datetime
 import joblib
 import tasks
 import datautils
+import utils
 from simts_dlinear import SimTSDlinear
 from utils import init_dl_program, name_with_datetime, pkl_save, data_dropout
 
@@ -111,7 +112,7 @@ if __name__ == '__main__':
         unit = 'epoch' if args.epochs is not None else 'iter'
         config[f'after_{unit}_callback'] = save_checkpoint_callback(args.save_every, unit)
 
-    run_dir = './' + args.dir + '/dlinear/' + args.dataset
+    run_dir = './' + args.dir + '/dlinear/' + args.dataset + '__' + utils.name_with_datetime('forecast_multivar')
     os.makedirs(run_dir, exist_ok=True)
 
     t = time.time()
