@@ -159,6 +159,7 @@ class SimTSDlinear:
         self.experiment = experiment
         self.experiment_args = experiment_args
         self.K = K
+        self.raw_length = raw_length
         self.net_avg = CausalCNNEncoder(in_channels=input_dims,
                                     reduced_size=320,
                                     component_dims=output_dims,
@@ -176,7 +177,10 @@ class SimTSDlinear:
 
         self.mix = mix
 
-        self.timestep = max_train_length - K
+        if self.raw_length > max_train_length:
+            self.timestep = max_train_length - K
+        else:
+            self.timestep = self.raw_length - K
         self.n_time_cols = n_time_cols
 
         self.dropout = torch.nn.Dropout(p=0.9, inplace=False)
@@ -333,7 +337,7 @@ class SimTSDlinear:
             if self.after_epoch_callback is not None:
                 self.after_epoch_callback(self, cum_loss)
 
-            #break # only one epoch
+            # break # only one epoch
 
         return loss_log, best_net_avg, best_net_err
 

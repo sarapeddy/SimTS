@@ -138,6 +138,7 @@ class SimTS:
         self.experiment = experiment
         self.experiment_args=experiment_args
         self.K = K
+        self.raw_length = raw_length
         self.net = CausalCNNEncoder(in_channels = input_dims, 
                                     reduced_size=320, 
                                     component_dims = output_dims, 
@@ -150,8 +151,11 @@ class SimTS:
         self.n_iters = 0
         
         self.mix = mix
-        
-        self.timestep = max_train_length-K
+
+        if self.raw_length > max_train_length:
+            self.timestep = self.max_train_length - K
+        else:
+            self.timestep = self.raw_length - K
         
         self.dropout = torch.nn.Dropout(p=0.9, inplace=False)
         self.predictor =LinearPred(output_dims,1,output_dims, self.timestep)
