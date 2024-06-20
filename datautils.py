@@ -226,10 +226,13 @@ def load_forecast_csv(name, univar=False):
     
     if name in ('ETTh1', 'ETTh2', 'electricity', 'WTH'):
         pred_lens = [24, 48, 168, 336, 720]
-    elif name in ('ETTm1', 'ETTm2'):
+    elif name in ('ETTm1', 'ETTm2', 'exchange_rate'):
         pred_lens = [24, 48, 96, 288, 672]
+    elif name == 'national_illness':
+        pred_lens = [24, 36, 48, 60]
     else:
-        pred_lens = [24, 48, 168, 336, 720]
+        # pred_lens = [24, 48, 168, 336, 720]
+        pred_lens = [24, 48, 96, 288, 672]
         
     return data, train_slice, valid_slice, test_slice, scaler, pred_lens, n_covariate_cols
 
