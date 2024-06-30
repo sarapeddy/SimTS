@@ -29,11 +29,11 @@ def save_checkpoint_callback(
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', default='ETTh1', help='The dataset name')
+    parser.add_argument('--dataset', default='EigenWorms', help='The dataset name')
     parser.add_argument('--kernels', type=int, nargs='+', default=[1, 2, 4, 8, 16, 32, 64, 128, 256, 1, 2, 4, 8, 16, 32, 64, 128, 256], help='The kernel sizes used in the mixture of AR expert layers')
     parser.add_argument('--mask_dir',default=None, help='directory to dynamask dataset')
     parser.add_argument('--dir', default='training/forecasting', help='The folder name used to save model, output and evaluation metrics. This can be set to any word')
-    parser.add_argument('--loader', type=str, default='forecast_csv', help='The data loader used to load the experimental data. This can be set to UCR, UEA, forecast_csv, forecast_csv_univar, anomaly, or anomaly_coldstart')
+    parser.add_argument('--loader', type=str, default='UEA', help='The data loader used to load the experimental data. This can be set to UCR, UEA, forecast_csv, forecast_csv_univar, anomaly, or anomaly_coldstart')
     parser.add_argument('--gpu', type=int, default=0, help='The gpu no. used for training and inference (defaults to 0)')
     parser.add_argument('--batch-size', type=int, default=8, help='The batch size (defaults to 8)')
     parser.add_argument('--lr', type=float, default=0.001, help='The learning rate (defaults to 0.001)')
@@ -114,14 +114,15 @@ if __name__ == '__main__':
         max_train_length=args.max_train_length,
         experiment=args.experiment,
         experiment_args={'sigma':0.5},
-        mix = args.mix
+        mix = args.mix,
+        task_type=task_type
     )
     
     if args.save_every is not None:
         unit = 'epoch' if args.epochs is not None else 'iter'
         config[f'after_{unit}_callback'] = save_checkpoint_callback(args.save_every, unit)
 
-    run_dir = './' + args.dir + '/normal/' + args.dataset + '__' + utils.name_with_datetime('forecast_multivar')
+    run_dir = './' + args.dir + '/normal/' + args.dataset + '__' + utils.name_with_datetime(f'{task_type}')
     os.makedirs(run_dir, exist_ok=True)
     
     t = time.time()
