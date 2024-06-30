@@ -112,7 +112,7 @@ class SimTS:
         after_iter_callback=None,
         after_epoch_callback=None,
         mix = False,
-        
+        task_type='forecasting'
     ):
         ''' Initialize a SimTS model.
         
@@ -152,10 +152,15 @@ class SimTS:
         
         self.mix = mix
 
+        self.task_type=task_type
+
+        if self.task_type == 'classification':
+            self.K = self.raw_length // 2
+
         if self.raw_length > max_train_length:
-            self.timestep = self.max_train_length - K
+            self.timestep = self.max_train_length - self.K
         else:
-            self.timestep = self.raw_length - K
+            self.timestep = self.raw_length - self.K
         
         self.dropout = torch.nn.Dropout(p=0.9, inplace=False)
         self.predictor =LinearPred(output_dims,1,output_dims, self.timestep)
@@ -249,8 +254,11 @@ class SimTS:
                 torch.cuda.empty_cache()
                 
                 z1, _, z2= self.net(x1, x2, mask = None)
-                
-                rand_idx = random.randint(127, z1.shape[1]-1)
+
+                if z1.shape[1] - 1 > 127:
+                    rand_idx = random.randint(127, z1.shape[1] - 1)
+                else:
+                    rand_idx = z1.shape[1] - 1
                 # trend_h_repr = lasts
                 trend1 = z1[:,rand_idx,:]
                 # print(rand_idx)
