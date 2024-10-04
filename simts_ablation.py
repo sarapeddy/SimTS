@@ -112,7 +112,7 @@ class LinearPred(torch.nn.Module):
         return x_pred2
 
 
-class SimTSDlinear:
+class SimTSAblation:
     '''The SimTS model'''
 
     def __init__(
@@ -165,10 +165,10 @@ class SimTSDlinear:
                                     reduced_size=320,
                                     component_dims=output_dims,
                                     kernel_list=kernel_list).to(self.device)
-        self.net_err = CausalCNNEncoder(in_channels=input_dims,
-                                    reduced_size=320,
-                                    component_dims=output_dims,
-                                    kernel_list=kernel_list).to(self.device)
+        # self.net_err = CausalCNNEncoder(in_channels=input_dims,
+        #                             reduced_size=320,
+        #                             component_dims=output_dims,
+        #                             kernel_list=kernel_list).to(self.device)
 
         self.after_iter_callback = after_iter_callback
         self.after_epoch_callback = after_epoch_callback
@@ -251,7 +251,7 @@ class SimTSDlinear:
 
         optimizer = torch.optim.SGD([
             {'params': list(self.net_avg.parameters())},
-            {'params': list(self.net_err.parameters())},
+            # {'params': list(self.net_err.parameters())},
             {'params': list(self.predictor.parameters()), 'lr': 0.0001 * self.lr}
         ], lr=self.lr)
 
@@ -277,29 +277,29 @@ class SimTSDlinear:
                 if self.max_train_length is not None and x_avg.size(1) > self.max_train_length and x_err.size(1) > self.max_train_length:
                     window_offset = np.random.randint(x_avg.size(1) - self.max_train_length + 1)
                     x_avg = x_avg[:, window_offset: window_offset + self.max_train_length]
-                    x_err = x_err[:, window_offset: window_offset + self.max_train_length]
+                    # x_err = x_err[:, window_offset: window_offset + self.max_train_length]
 
                 if x_avg.shape[1] > self.max_train_length:
                     x1_avg = x_avg[:, :self.K, :].clone().to(self.device)
                     x2_avg = x_avg[:, self.K:self.max_train_length, :].clone().to(self.device)
 
-                    x1_err = x_err[:, :self.K, :].clone().to(self.device)
-                    x2_err = x_err[:, self.K:self.max_train_length, :].clone().to(self.device)
+                    # x1_err = x_err[:, :self.K, :].clone().to(self.device)
+                    # x2_err = x_err[:, self.K:self.max_train_length, :].clone().to(self.device)
                 else:
                     x1_avg = x_avg[:, :self.K, :].clone().to(self.device)
                     x2_avg = x_avg[:, self.K:self.raw_length, :].clone().to(self.device)
 
-                    x1_err = x_err[:, :self.K, :].clone().to(self.device)
-                    x2_err = x_err[:, self.K:self.raw_length, :].clone().to(self.device)
+                    # x1_err = x_err[:, :self.K, :].clone().to(self.device)
+                    # x2_err = x_err[:, self.K:self.raw_length, :].clone().to(self.device)
 
                 optimizer.zero_grad()
 
                 torch.cuda.empty_cache()
 
-                z1_avg, _, z2_avg = self.net_avg(x1_avg, x2_avg, mask=None)
-                z1_err, _, z2_err = self.net_err(x1_err, x2_err, mask=None)
-                z1 = z1_avg + z1_err
-                z2 = z2_avg + z2_err
+                z1, _, z2 = self.net_avg(x1_avg, x2_avg, mask=None)
+                # z1, _, z2 = self.net_err(x1_err, x2_err, mask=None)
+                # z1 = z1_avg + z1_err
+                # z2 = z2_avg + z2_err
 
                 if z1.shape[1] - 1 > 127:
                     rand_idx = random.randint(127, z1.shape[1] - 1)
@@ -356,10 +356,10 @@ class SimTSDlinear:
 
             old_para = para
             para_avg = self.net_avg.print_para()
-            para_err = self.net_err.print_para()
+            # para_err = self.net_err.print_para()
             if old_para != None:
                 print(torch.equal(para_avg.data, old_para.data))
-                print(torch.equal(para_err.data, old_para.data))
+                # print(torch.equal(para_err.data, old_para.data))
             cum_loss /= n_epoch_iters
             loss_log.append(cum_loss)
             if best_loss - cum_loss <= 0.0001:
@@ -369,7 +369,7 @@ class SimTSDlinear:
             if best_loss > cum_loss:
                 best_loss = cum_loss
                 best_net_avg = self.net_avg
-                best_net_err = self.net_err
+                # best_net_err = self.net_err
             if verbose:
                 print(f"Epoch #{self.n_epochs}: loss={cum_loss}")
             self.n_epochs += 1
@@ -381,14 +381,12 @@ class SimTSDlinear:
 
         return loss_log, best_net_avg, best_net_err
 
-    def _eval_with_pooling(self, x, y, mask=None, slicing=None, encoding_window=None):
+    def _eval_with_pooling(self, x, mask=None, slicing=None, encoding_window=None):
 
-        _, out1, _ = self.net_avg(x.to(self.device, non_blocking=True), train=False)
-        _, out2, _ = self.net_err(y.to(self.device, non_blocking=True), train=False)
+        _, out, _ = self.net_avg(x.to(self.device, non_blocking=True), train=False)
 
-        out1 = out1.unsqueeze(1)
-        out2 = out2.unsqueeze(1)
-        return out1.cpu(), out2.cpu()
+        out = out.unsqueeze(1)
+        return out.cpu()
 
     def encode(self, data, mask=None, encoding_window=None, casual=False, sliding_length=None, sliding_padding=0,
                batch_size=None):
@@ -406,7 +404,7 @@ class SimTSDlinear:
         Returns:
             repr: The representations for data.
         '''
-        assert self.net_avg is not None and self.net_err is not None, 'please train or load a net first'
+        assert self.net_avg is not None, 'please train or load a net first'
         if data.ndim != 3:
             data = data.unsqueeze(0)
 
@@ -418,10 +416,8 @@ class SimTSDlinear:
             batch_size = self.batch_size
         n_samples, ts_l, _ = data.shape
 
-        org_training_avg = self.net_avg.training
-        org_training_err = self.net_err.training
+        org_training = self.net_avg.training
         self.net_avg.eval()
-        self.net_err.eval()
 
         # dataset = TensorDataset(torch.from_numpy(data.astype(np.float32)))
         # loader = DataLoader(dataset, batch_size=batch_size)
@@ -430,15 +426,14 @@ class SimTSDlinear:
         loader = create_custom_dataLoader(dataset, batch_size, n_time_cols=self.n_time_cols, eval=True)
 
         with torch.no_grad():
-            output1 = []
-            output2 = []
+            output = []
             for x, y in loader:
+                # x = y
+                # x = batch[0]
                 if sliding_length is not None:
-                    reprs1 = []
-                    reprs2 = []
+                    reprs = []
                     if n_samples < batch_size:
-                        calc_buffer1 = []
-                        calc_buffer2 = []
+                        calc_buffer = []
                         calc_buffer_l = 0
                     for i in range(0, ts_l, sliding_length):
                         l = i - sliding_padding
@@ -449,81 +444,56 @@ class SimTSDlinear:
                             right=r - ts_l if r > ts_l else 0,
                             dim=1
                         )
-                        y_sliding = torch_pad_nan(
-                            y[:, max(l, 0): min(r, ts_l)],
-                            left=-l if l < 0 else 0,
-                            right=r - ts_l if r > ts_l else 0,
-                            dim=1
-                        )
                         if n_samples < batch_size:
                             if calc_buffer_l + n_samples > batch_size:
-                                out1, out2 = self._eval_with_pooling(
-                                    torch.cat(calc_buffer1, dim=0),
-                                    torch.cat(calc_buffer2, dim=0),
+                                out = self._eval_with_pooling(
+                                    torch.cat(calc_buffer, dim=0),
                                     mask,
                                     slicing=slice(sliding_padding, sliding_padding + sliding_length),
                                     encoding_window=encoding_window
                                 )
-                                reprs1 += torch.split(out1, n_samples)
-                                reprs2 += torch.split(out2, n_samples)
-                                calc_buffer1 = []
-                                calc_buffer2 = []
+                                reprs += torch.split(out, n_samples)
+                                calc_buffer = []
                                 calc_buffer_l = 0
-                            calc_buffer1.append(x_sliding)
-                            calc_buffer2.append(y_sliding)
+                            calc_buffer.append(x_sliding)
                             calc_buffer_l += n_samples
                         else:
-                            out1, out2 = self._eval_with_pooling(
+                            out = self._eval_with_pooling(
                                 x_sliding,
-                                y_sliding,
                                 mask,
                                 slicing=slice(sliding_padding, sliding_padding + sliding_length),
                                 encoding_window=encoding_window
                             )
-                            reprs1.append(out1)
-                            reprs2.append(out2)
+                            reprs.append(out)
 
                     if n_samples < batch_size:
                         if calc_buffer_l > 0:
-                            out1, out2 = self._eval_with_pooling(
-                                torch.cat(calc_buffer1, dim=0),
-                                torch.cat(calc_buffer2, dim=0),
+                            out = self._eval_with_pooling(
+                                torch.cat(calc_buffer, dim=0),
                                 mask,
                                 slicing=slice(sliding_padding, sliding_padding + sliding_length),
                                 encoding_window=encoding_window
                             )
-                            reprs1 += torch.split(out1, n_samples)
-                            reprs2 += torch.split(out2, n_samples)
-                            calc_buffer1 = []
-                            calc_buffer2 = []
+                            reprs += torch.split(out, n_samples)
+                            calc_buffer = []
                             calc_buffer_l = 0
 
-                    out1 = torch.cat(reprs1, dim=1)
-                    out2 = torch.cat(reprs2, dim=1)
+                    out = torch.cat(reprs, dim=1)
                     if encoding_window == 'full_series':
                         out = F.max_pool1d(
                             out.transpose(1, 2).contiguous(),
                             kernel_size=out.size(1),
                         ).squeeze(1)
-                        out2 = F.max_pool1d(
-                            out2.transpose(1, 2).contiguous(),
-                            kernel_size=out2.size(1),
-                        ).squeeze(1)
                 else:
-                    out1, out2 = self._eval_with_pooling(x, y, mask, encoding_window=encoding_window)
+                    out = self._eval_with_pooling(x, mask, encoding_window=encoding_window)
                     if encoding_window == 'full_series':
-                        out1 = out1.squeeze(1)
-                        out2 = out2.squeeze(1)
+                        out = out.squeeze(1)
 
-                output1.append(out1)
-                output2.append(out2)
+                output.append(out)
 
-            output1 = torch.cat(output1, dim=0)
-            output2 = torch.cat(output2, dim=0)
+            output = torch.cat(output, dim=0)
 
-        output = output1 + output2
-        self.net_avg.train(org_training_avg)
-        self.net_err.train(org_training_err)
+        self.net_avg.train(org_training)
         return output.numpy()
 
     def save(self, fn1, fn2):
@@ -534,7 +504,7 @@ class SimTSDlinear:
             fn2 (str): filename.
         '''
         torch.save(self.net_avg.state_dict(), fn1)
-        torch.save(self.net_err.state_dict(), fn2)
+        # torch.save(self.net_err.state_dict(), fn2)
 
     def load(self, fn1, fn2):
         ''' Load the model from a file.
@@ -544,9 +514,9 @@ class SimTSDlinear:
             fn2 (str): filename.
         '''
         state_dict_avg = torch.load(fn1, map_location=self.device)
-        state_dict_err = torch.load(fn2, map_location=self.device)
+        # state_dict_err = torch.load(fn2, map_location=self.device)
         self.net_avg.load_state_dict(state_dict_avg)
-        self.net_err.load_state_dict(state_dict_err)
+        # self.net_err.load_state_dict(state_dict_err)
 
 
 def adjust_learning_rate(optimizer, epoch, lr, total_epochs):

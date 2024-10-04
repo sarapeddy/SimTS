@@ -2,6 +2,8 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader, Dataset
 import numpy as np
+
+from moving_avg_tensor_dataset import TimeSeriesDatasetWithMovingAvg
 from utils import centerize_vary_length_series, torch_pad_nan,overlap,pad_nan_to_target
 import math
 import random
@@ -112,7 +114,9 @@ class SimTS:
         after_iter_callback=None,
         after_epoch_callback=None,
         mix = False,
-        task_type='forecasting'
+        task_type='forecasting',
+        mode='ts2vec',
+        n_time_cols=0
     ):
         ''' Initialize a SimTS model.
         
@@ -149,10 +153,12 @@ class SimTS:
         
         self.n_epochs = 0
         self.n_iters = 0
-        
+
+        self.mode = mode
         self.mix = mix
 
         self.task_type=task_type
+        self.n_time_cols = n_time_cols
 
         if self.task_type == 'classification':
             self.K = self.raw_length // 2
@@ -215,6 +221,8 @@ class SimTS:
         # from https://github.com/salesforce/CoST/blob/afc26aa0239470f522135f470861a1c375507e84/cost.py#L17
         # train_dataset = PretrainDataset(torch.from_numpy(train_data).to(torch.float), sigma=0.5, multiplier=multiplier)
         train_dataset = TensorDataset(torch.from_numpy(train_data).to(torch.float))
+        if self.mode == 'feature':
+            train_dataset = TimeSeriesDatasetWithMovingAvg(torch.from_numpy(train_data).to(torch.float), n_time_cols=self.n_time_cols)
         train_loader = DataLoader(train_dataset, batch_size=min(self.batch_size, len(train_dataset)), shuffle=True, drop_last=True)
 
         optimizer = torch.optim.SGD([
@@ -344,6 +352,8 @@ class SimTS:
         self.net.eval()
         
         dataset = TensorDataset(torch.from_numpy(data.astype(np.float32)))
+        if self.mode == 'feature':
+            dataset = TimeSeriesDatasetWithMovingAvg(torch.from_numpy(data).to(torch.float), self.n_time_cols)
         loader = DataLoader(dataset, batch_size=batch_size)
         
         with torch.no_grad():

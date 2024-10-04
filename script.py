@@ -11,6 +11,7 @@ import joblib
 import tasks
 import datautils
 import utils
+from simts_ablation import SimTSAblation
 from simts_dlinear import SimTSDlinear
 from utils import init_dl_program, name_with_datetime, pkl_save, data_dropout
 
@@ -31,14 +32,15 @@ def save_checkpoint_callback(
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', default='ERing', help='The dataset name')
+    parser.add_argument('--dataset', default='electricity', help='The dataset name')
     parser.add_argument('--kernels', type=int, nargs='+',
                         default=[1, 2, 4, 8, 16, 32, 64, 128, 256, 1, 2, 4, 8, 16, 32, 64, 128, 256],
                         help='The kernel sizes used in the mixture of AR expert layers')
+    parser.add_argument('--mode', type=str, default='dlinear', help='The mode used for training')
     parser.add_argument('--mask_dir', default=None, help='directory to dynamask dataset')
-    parser.add_argument('--dir', default='training/classification',
+    parser.add_argument('--dir', default='training/forecasting',
                         help='The folder name used to save model, output and evaluation metrics. This can be set to any word')
-    parser.add_argument('--loader', type=str, default='UEA',
+    parser.add_argument('--loader', type=str, default='forecast_csv',
                         help='The data loader used to load the experimental data. This can be set to UCR, UEA, forecast_csv, forecast_csv_univar, anomaly, or anomaly_coldstart')
     parser.add_argument('--gpu', type=int, default=0,
                         help='The gpu no. used for training and inference (defaults to 0)')
@@ -122,20 +124,29 @@ if __name__ == '__main__':
         config[f'after_{unit}_callback'] = save_checkpoint_callback(args.save_every, unit)
 
     if task_type == 'forecasting':
-        run_dir = './' + args.dir + '/dlinear/' + args.dataset + '__' + utils.name_with_datetime('forecast_multivar')
+        run_dir = './' + args.dir + f'/B{args.batch_size}_E{args.repr_dims}/' + args.mode + '/' + args.dataset + '__' + utils.name_with_datetime('forecast_multivar')
     elif task_type == 'classification':
-        run_dir = './' + args.dir + '/dlinear/' + args.dataset + '__' + utils.name_with_datetime('classification')
+        run_dir = './' + args.dir + f'/B{args.batch_size}_E{args.repr_dims}/' + args.mode + '/' + args.dataset + '__' + utils.name_with_datetime('classification')
     else:
         assert False
     os.makedirs(run_dir, exist_ok=True)
 
     t = time.time()
     print("train_data size:", train_data.shape)
-    model = SimTSDlinear(
-        input_dims=train_data.shape[-1],
-        device=device,
-        **config
-    )
+
+
+    if args.mode == 'dlinear':
+        model = SimTSDlinear(
+            input_dims=train_data.shape[-1],
+            device=device,
+            **config
+        )
+    else:
+        model = SimTSAblation(
+            input_dims=train_data.shape[-1],
+            device=device,
+            **config
+        )
 
     loss_log, best_net_avg, best_net_err = model.fit(
         train_data,
@@ -144,6 +155,7 @@ if __name__ == '__main__':
         n_iters=args.iters,
         verbose=True
     )
+
     # model.net = best_net
     model.save(f'{run_dir}/model_avg.pkl', f'{run_dir}/model_err.pkl')
 

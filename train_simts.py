@@ -29,11 +29,12 @@ def save_checkpoint_callback(
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', default='EigenWorms', help='The dataset name')
+    parser.add_argument('--dataset', default='ETTh1', help='The dataset name')
     parser.add_argument('--kernels', type=int, nargs='+', default=[1, 2, 4, 8, 16, 32, 64, 128, 256, 1, 2, 4, 8, 16, 32, 64, 128, 256], help='The kernel sizes used in the mixture of AR expert layers')
+    parser.add_argument('--mode', type=str, default='feature', help='The mode used for training')
     parser.add_argument('--mask_dir',default=None, help='directory to dynamask dataset')
     parser.add_argument('--dir', default='training/forecasting', help='The folder name used to save model, output and evaluation metrics. This can be set to any word')
-    parser.add_argument('--loader', type=str, default='UEA', help='The data loader used to load the experimental data. This can be set to UCR, UEA, forecast_csv, forecast_csv_univar, anomaly, or anomaly_coldstart')
+    parser.add_argument('--loader', type=str, default='forecast_csv', help='The data loader used to load the experimental data. This can be set to UCR, UEA, forecast_csv, forecast_csv_univar, anomaly, or anomaly_coldstart')
     parser.add_argument('--gpu', type=int, default=0, help='The gpu no. used for training and inference (defaults to 0)')
     parser.add_argument('--batch-size', type=int, default=8, help='The batch size (defaults to 8)')
     parser.add_argument('--lr', type=float, default=0.001, help='The learning rate (defaults to 0.001)')
@@ -75,22 +76,22 @@ if __name__ == '__main__':
         
     elif args.loader == 'forecast_csv':
         task_type = 'forecasting'
-        data, train_slice, valid_slice, test_slice, scaler, pred_lens, n_covariate_cols = datautils.load_forecast_csv(args.dataset)
+        data, train_slice, valid_slice, test_slice, scaler, pred_lens, n_time_cols = datautils.load_forecast_csv(args.dataset)
         train_data = data[:, train_slice]
         
     elif args.loader == 'forecast_csv_univar':
         task_type = 'forecasting'
-        data, train_slice, valid_slice, test_slice, scaler, pred_lens, n_covariate_cols = datautils.load_forecast_csv(args.dataset, univar=True)
+        data, train_slice, valid_slice, test_slice, scaler, pred_lens, n_time_cols = datautils.load_forecast_csv(args.dataset, univar=True)
         train_data = data[:, train_slice]
         
     elif args.loader == 'forecast_npy':
         task_type = 'forecasting'
-        data, train_slice, valid_slice, test_slice, scaler, pred_lens, n_covariate_cols = datautils.load_forecast_npy(args.dataset)
+        data, train_slice, valid_slice, test_slice, scaler, pred_lens, n_time_cols = datautils.load_forecast_npy(args.dataset)
         train_data = data[:, train_slice]
         
     elif args.loader == 'forecast_npy_univar':
         task_type = 'forecasting'
-        data, train_slice, valid_slice, test_slice, scaler, pred_lens, n_covariate_cols = datautils.load_forecast_npy(args.dataset, univar=True)
+        data, train_slice, valid_slice, test_slice, scaler, pred_lens, n_time_cols = datautils.load_forecast_npy(args.dataset, univar=True)
         train_data = data[:, train_slice]
         
     else:
@@ -115,20 +116,28 @@ if __name__ == '__main__':
         experiment=args.experiment,
         experiment_args={'sigma':0.5},
         mix = args.mix,
-        task_type=task_type
+        task_type=task_type,
+        mode=args.mode,
+        n_time_cols=n_time_cols if task_type == 'forecasting' else 0
     )
     
     if args.save_every is not None:
         unit = 'epoch' if args.epochs is not None else 'iter'
         config[f'after_{unit}_callback'] = save_checkpoint_callback(args.save_every, unit)
 
-    run_dir = './' + args.dir + '/normal/' + args.dataset + '__' + utils.name_with_datetime(f'{task_type}')
+    run_dir = './' + args.dir + f'/B{args.batch_size}_E{args.repr_dims}/' + args.mode + '/' + args.dataset + '__' + utils.name_with_datetime(f'{task_type}')
     os.makedirs(run_dir, exist_ok=True)
     
     t = time.time()
     print("train_data size:",train_data.shape)
+
+    if args.mode == 'feature':
+        input_dims = train_data.shape[-1] + (train_data.shape[-1] - n_time_cols)
+    else:
+        input_dims = train_data.shape[-1]
+
     model = SimTS(
-        input_dims=train_data.shape[-1],
+        input_dims=input_dims,
         device=device,
         **config
     )
@@ -151,7 +160,7 @@ if __name__ == '__main__':
             out, eval_res,clf = tasks.eval_classification(model,train_data, train_labels, test_data, test_labels, eval_protocol='svm')
             joblib.dump(clf, f'{run_dir}/svm.pkl')
         elif task_type == 'forecasting':
-            out, eval_res = tasks.eval_forecasting(model, data, train_slice, valid_slice, test_slice, scaler, pred_lens, n_covariate_cols)
+            out, eval_res = tasks.eval_forecasting(model, data, train_slice, valid_slice, test_slice, scaler, pred_lens, n_time_cols, run_dir)
         else:
             assert False
         pkl_save(f'{run_dir}/out.pkl', out)
